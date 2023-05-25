@@ -27,7 +27,7 @@ class WC_Gateway_Westernbid extends WC_Payment_Gateway {
 
 		// action hook saves settings
 		add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, array( $this, 'process_admin_options' ) );
-		// register a webhook here
+		// register webhook
 		add_action( 'woocommerce_api_wc_gateway_westernbid', array( $this, 'check_response' ) );
 
 	}
@@ -240,8 +240,8 @@ class WC_Gateway_Westernbid extends WC_Payment_Gateway {
 		//	die();
 		//}
 
-		file_put_contents( WP_CONTENT_DIR . '/wb_log.txt', print_r( $payload, true ), FILE_APPEND );
-		file_put_contents( WP_CONTENT_DIR . '/wb_log.txt', '---- // ---- // ---- // ----', FILE_APPEND );
+		//file_put_contents( WP_CONTENT_DIR . '/wb_log.txt', print_r( $payload, true ), FILE_APPEND );
+		//file_put_contents( WP_CONTENT_DIR . '/wb_log.txt', '---- // ---- // ---- // ----', FILE_APPEND );
 
 		// send to westernbid for processing
 		$response = wp_remote_post( $this->gateway_endpoint, array(
@@ -251,8 +251,8 @@ class WC_Gateway_Westernbid extends WC_Payment_Gateway {
 			'sslverify' => false,
 		) );
 		
-		file_put_contents( WP_CONTENT_DIR . '/wb_log.txt', print_r( $response, true ), FILE_APPEND );
-		file_put_contents( WP_CONTENT_DIR . '/wb_log.txt', '---- // ---- // ---- // ----', FILE_APPEND );
+		//file_put_contents( WP_CONTENT_DIR . '/wb_log.txt', print_r( $response, true ), FILE_APPEND );
+		//file_put_contents( WP_CONTENT_DIR . '/wb_log.txt', '---- // ---- // ---- // ----', FILE_APPEND );
 		
 		if ( is_wp_error( $response ) ) {
 			wc_add_notice( 'Connection error.', 'error' );
@@ -283,6 +283,8 @@ class WC_Gateway_Westernbid extends WC_Payment_Gateway {
 		$paypal_args       = $this->get_inputs( $response_body );
 		$paypal_action_url = $this->get_action_url( $response_body );
 		$woocommerce->cart->empty_cart();
+
+		$this->send_telegram_messege("\xF0\x9F\x99\x8C Нове замовлення\n\nНомер замовлення: ".$order->get_id().".\nСума замовлення: ".$order_total." USD.\nЧас: ".date("d-m-Y H:i:s").".");
 		
 		return array(
 			'result'   => 'success',
@@ -344,20 +346,17 @@ class WC_Gateway_Westernbid extends WC_Payment_Gateway {
 			switch ( $payment_status ) {
 				case 'pending' :
 					$order->update_status( 'processing' );
-					$this->send_telegram_messege("\xF0\x9F\x99\x8C Нове замовлення\n\nНомер замовлення: ".$order_id.".\nНомер транзакції: ".$_POST['transaction_id'].".\nСума замовлення: ".$_POST['payment_gross']." USD.\nЧас: ".$_POST['payment_date'].".");
-					file_put_contents( WP_CONTENT_DIR . '/wb_log.txt', '!!!! Payment status: '.$payment_status.'. Time: '.$_POST['payment_date'].' !!!!', FILE_APPEND );
+					$this->send_telegram_messege("\xE2\x9C\x85 Успішна оплата\n\nНомер замовлення: ".$order_id.".\nНомер транзакції: ".$_POST['transaction_id'].".\nСума замовлення: ".$_POST['payment_gross']." USD.\nЧас: ".$_POST['payment_date'].".");
 					break;
 				case 'completed' :
 					if($order->get_status() === 'processing') {
 	        			$order->update_status( 'completed' );
-	        			$this->send_telegram_messege("\xE2\x9C\x85 Успішна оплата\n\nНомер замовлення: ".$order_id.".\nНомер транзакції: ".$_POST['transaction_id'].".\nСума замовлення: ".$_POST['payment_gross']." USD.\nЧас: ".$_POST['payment_date'].".");
-	        			file_put_contents( WP_CONTENT_DIR . '/wb_log.txt', '!!!! Payment status: '.$payment_status.'. Time: '.$_POST['payment_date'].' !!!!', FILE_APPEND );
+	        			$this->send_telegram_messege("\xF0\x9F\x92\xB0 Кошти успішно додано до балансу вашого рахунку\n\nНомер замовлення: ".$order_id.".\nНомер транзакції: ".$_POST['transaction_id'].".\nСума замовлення: ".$_POST['payment_gross']." USD.\nЧас: ".$_POST['payment_date'].".");
 	    			} else { $order->add_order_note( 'Payment status: completed' ); }
 					break;
 				default:
 					$order->add_order_note( 'Payment status: ' . $payment_status );
 					$this->send_telegram_messege("\xE2\x9D\x97 Увага, статус замовлення ".$order_id."(".$_POST['transaction_id'].") змінено на: ".$payment_status.".");
-					file_put_contents( WP_CONTENT_DIR . '/wb_log.txt', '!!!! Payment status: '.$payment_status.'. Time: '.$_POST['payment_date'].' !!!!', FILE_APPEND );
 			}
 
 		}

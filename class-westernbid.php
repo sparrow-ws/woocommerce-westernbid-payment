@@ -240,9 +240,6 @@ class WC_Gateway_Westernbid extends WC_Payment_Gateway {
 		//	die();
 		//}
 
-		//file_put_contents( WP_CONTENT_DIR . '/wb_log.txt', print_r( $payload, true ), FILE_APPEND );
-		//file_put_contents( WP_CONTENT_DIR . '/wb_log.txt', '---- // ---- // ---- // ----', FILE_APPEND );
-
 		// send to westernbid for processing
 		$response = wp_remote_post( $this->gateway_endpoint, array(
 			'method'    => 'POST',
@@ -250,9 +247,6 @@ class WC_Gateway_Westernbid extends WC_Payment_Gateway {
 			'timeout'   => 90,
 			'sslverify' => false,
 		) );
-		
-		//file_put_contents( WP_CONTENT_DIR . '/wb_log.txt', print_r( $response, true ), FILE_APPEND );
-		//file_put_contents( WP_CONTENT_DIR . '/wb_log.txt', '---- // ---- // ---- // ----', FILE_APPEND );
 		
 		if ( is_wp_error( $response ) ) {
 			wc_add_notice( 'Connection error.', 'error' );
@@ -269,6 +263,10 @@ class WC_Gateway_Westernbid extends WC_Payment_Gateway {
 		// get response body if there are no errors
 		$response_code = wp_remote_retrieve_response_code( $response );
 		$response_body = wp_remote_retrieve_body( $response );
+
+		//file_put_contents( WP_CONTENT_DIR . '/wb_log.txt', print_r( ' ! '.$response_body.' ! ', true ), FILE_APPEND );
+		//file_put_contents( WP_CONTENT_DIR . '/wb_log.txt', '---- // ---- // ---- // ----', FILE_APPEND );
+
 		if ( $response_code != 200 ) {
 			wc_add_notice( $response_body, 'error' );
 			//wc_add_notice( 'An error occurred while getting data from WesternBid. Try to make a purchase later.', 'error' );
@@ -279,16 +277,15 @@ class WC_Gateway_Westernbid extends WC_Payment_Gateway {
 			return;
 		}
 		
-
 		$paypal_args       = $this->get_inputs( $response_body );
 		$paypal_action_url = $this->get_action_url( $response_body );
 		$woocommerce->cart->empty_cart();
 
 		$this->send_telegram_messege("\xF0\x9F\x99\x8C Нове замовлення\n\nНомер замовлення: ".$order->get_id().".\nСума замовлення: ".$order_total." USD.\nЧас: ".date("d-m-Y H:i:s").".");
-		
+
 		return array(
 			'result'   => 'success',
-			'redirect' => $paypal_action_url . '?' . http_build_query( $paypal_args, '', '&' ),
+			'redirect' => $paypal_action_url.'?'.http_build_query($paypal_args, '', '&'),
 		);
 
 	}
@@ -343,19 +340,28 @@ class WC_Gateway_Westernbid extends WC_Payment_Gateway {
 			$order = wc_get_order( $order_id );
 			update_post_meta( $order_id, '_westernbid_transaction_id', $_POST['transaction_id'] );
 
+			//file_put_contents( WP_CONTENT_DIR . '/wb_log.txt', print_r( ' --\\-- '.$order_id.' : '.$payment_status.' : '.$_POST['transaction_id'].' --\\-- ', true ), FILE_APPEND );
+
 			switch ( $payment_status ) {
+				/*
 				case 'pending' :
 					$order->update_status( 'processing' );
 					$this->send_telegram_messege("\xE2\x9C\x85 Успішна оплата\n\nНомер замовлення: ".$order_id.".\nНомер транзакції: ".$_POST['transaction_id'].".\nСума замовлення: ".$_POST['payment_gross']." USD.\nЧас: ".$_POST['payment_date'].".");
 					break;
+				*/
 				case 'completed' :
+					// $order->update_status( 'completed' );
+					$order->update_status( 'processing' );
+					$this->send_telegram_messege("\xE2\x9C\x85 Успішна оплата\n\nНомер замовлення: ".$order_id.".\nНомер транзакції: ".$_POST['transaction_id'].".\nСума замовлення: ".$_POST['payment_gross']." USD.\nЧас: ".$_POST['payment_date'].".");
+					/*
 					if($order->get_status() === 'processing') {
 	        			$order->update_status( 'completed' );
 	        			$this->send_telegram_messege("\xF0\x9F\x92\xB0 Кошти успішно додано до балансу вашого рахунку\n\nНомер замовлення: ".$order_id.".\nНомер транзакції: ".$_POST['transaction_id'].".\nСума замовлення: ".$_POST['payment_gross']." USD.\nЧас: ".$_POST['payment_date'].".");
 	    			} else { $order->add_order_note( 'Payment status: completed' ); }
+	    			*/
 					break;
 				default:
-					$order->add_order_note( 'Payment status: ' . $payment_status );
+					$order->add_order_note('Payment status: '.$payment_status);
 					$this->send_telegram_messege("\xE2\x9D\x97 Увага, статус замовлення ".$order_id."(".$_POST['transaction_id'].") змінено на: ".$payment_status.".");
 			}
 
